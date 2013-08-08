@@ -40,7 +40,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
       //SUPPORTED ATTRIBUTES (OPTIONS)
 
       //minimal no of characters that needs to be entered before typeahead kicks-in
-      var minSearch = originalScope.$eval(attrs.typeaheadMinLength) || 1;
+      var minSearch = attrs.typeaheadMinLength !== undefined ? originalScope.$eval(attrs.typeaheadMinLength) : 1;
 
       //minimal wait time after last character typed before typehead kicks-in
       var waitTime = originalScope.$eval(attrs.typeaheadWaitMs) || 0;
@@ -137,7 +137,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
       //we need to propagate user's query so we can higlight matches
       scope.query = undefined;
 
-      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later 
+      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
       var timeoutPromise;
 
       //plug into $parsers pipeline to open a typeahead on view changes initiated from DOM
@@ -145,7 +145,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
       modelCtrl.$parsers.push(function (inputValue) {
 
         resetMatches();
-        if (inputValue && inputValue.length >= minSearch) {
+        if (typeof inputValue === 'string' && inputValue.length >= minSearch) {
           if (waitTime > 0) {
             if (timeoutPromise) {
               $timeout.cancel(timeoutPromise);//cancel previous timeout
@@ -211,6 +211,11 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         if (scope.matches.length === 0 || HOT_KEYS.indexOf(evt.which) === -1) {
           return;
         }
+        if (evt.which === 9) {
+          resetMatches();
+          scope.$digest();
+          return;
+        }
 
         evt.preventDefault();
 
@@ -222,7 +227,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
           scope.activeIdx = (scope.activeIdx ? scope.activeIdx : scope.matches.length) - 1;
           scope.$digest();
 
-        } else if (evt.which === 13 || evt.which === 9) {
+        } else if (evt.which === 13) {
           scope.$apply(function () {
             scope.select(scope.activeIdx);
           });
@@ -235,10 +240,21 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         }
       });
 
-      $document.bind('click', function(){
+      $document.bind('click', function (event) {
         resetMatches();
+        var target = event.target;
+        target.blur();
+        target.focus();
         scope.$digest();
       });
+      if (minSearch === 0) {
+        element.bind('focus', function (event) {
+          getMatchesAsync(modelCtrl.$modelValue);
+          if (!scope.$$phase) {
+            scope.$digest();
+          }
+        });
+      }
 
       element.after($compile(popUpEl)(scope));
     }
@@ -305,6 +321,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
     }
 
     return function(matchItem, query) {
-      return query ? matchItem.replace(new RegExp(escapeRegexp(query), 'gi'), '<strong>$&</strong>') : query;
+      return (query) ? matchItem.replace(new RegExp(query, 'gi'), '<strong>$&</strong>') : matchItem;
     };
   });
